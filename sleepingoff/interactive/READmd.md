@@ -54,3 +54,5 @@ button {
   animation-iteration-count: infinite;
 }
 ```
+
+![렌더링 화면 샘플](./smaple.png)

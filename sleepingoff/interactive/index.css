@@ -14,7 +14,7 @@ body {
 
 ol,
 ul {
-    list-style: noen;
+    list-style: none;
 }
 
 a {
@@ -25,6 +25,11 @@ a {
 table {
     border-collapse: collapse;
     border-spacing: 0;
+}
+
+button {
+    background-color: transparent;
+    border: none;
 }
 
 header {
@@ -60,4 +65,19 @@ header {
 
 #main-image {
     min-width: 1000px;
+}
+
+.list-in-banner {
+    display: flex;
+    flex-wrap: wrap;
+    max-width: 1000px;
+}
+
+.button-in-banner {
+    background-color: #b8e1ee;
+    color: #04120c;
+    margin: 10px auto;
+    flex-basis: calc(1000px / 4 - 5%);
+    text-align: center;
+    padding: 8px;
 }
