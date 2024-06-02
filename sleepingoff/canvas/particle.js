@@ -6,8 +6,11 @@ class Particle {
     this.y = y;
     this.radius = radius;
     this.vy = vy;
+    this.acc = 1.03;
+    //0.9등 1보다 작은 수를 곱하면 서서히 멈춘다. 0 으로 수렴하기 때문
   }
   update() {
+    this.vy *= this.acc;
     this.y += this.vy;
   }
   draw() {
@@ -20,7 +23,7 @@ class Particle {
   }
 }
 
-const TOTAL = 10;
+const TOTAL = canvasWidth / 50;
 const particles = [];
 
 const randomNumBetween = (min, max) => {

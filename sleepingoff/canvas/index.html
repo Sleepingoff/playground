@@ -7,8 +7,41 @@
     <script type="module" src="index.js"></script>
     <script type="module" src="particle.js"></script>
     <title>canvas</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      canvas {
+        /* 
+        다음 속성으로 젤리같은 효과를 주게 되면, 배경 색상에 따라 실제 색상이 다르게 보일 수 있다.*/
+        filter: blur(50px) contrast(50);
+        background-color: black;
+        /* filter: url("#gooey"); */
+      }
+    </style>
   </head>
   <body>
     <canvas></canvas>
+
+    <!-- 블러, 각종 필터 정의
+        마스킹 처리에 대한 정의
+        재사용 컴포넌트처럼 사용 가능 -->
+    <svg>
+      <defs>
+        <filter id="gooey">
+          <feGaussianBlur stdDeviation="40" in="SourceGraphic" result="blur" />
+          <feColorMatrix
+            type="matrix"
+            values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 100 -23"
+            in="blur"
+            result="colormatrix"
+          />
+        </filter>
+      </defs>
+    </svg>
   </body>
 </html>
