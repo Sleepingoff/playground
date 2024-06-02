@@ -26,11 +26,7 @@ class Canvas extends CanvasOption {
     this.fillColors();
   }
   fillColors() {
-    this.colors = [
-      randomNumBetween(0, 255),
-      randomNumBetween(0, 255),
-      randomNumBetween(0, 255),
-    ];
+    this.colors = randomNumBetween(0, 360);
     return this.colors;
   }
   createTail(colors) {
@@ -73,7 +69,8 @@ class Canvas extends CanvasOption {
       const colors = this.fillColors();
       if (delta < this.interval) return;
 
-      this.ctx.fillStyle = this.bgColor + "50";
+      // this.ctx.fillStyle = this.bgColor + "50";
+      this.ctx.fillStyle = `rgba(255,255,255,${this.particles.length / 50000})`;
       this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
 
       if (Math.random() < 0.03) this.createTail(colors);

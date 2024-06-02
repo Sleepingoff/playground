@@ -11,6 +11,7 @@ export default class Particle extends CanvasOption {
     this.gravity = 0.12;
     this.friction = 0.93;
     this.color = color;
+    this.r = 1.5;
   }
 
   update() {
@@ -22,12 +23,13 @@ export default class Particle extends CanvasOption {
     this.x += this.vx;
 
     this.opacity -= 0.02;
+    this.r -= 0.02;
   }
 
   draw() {
-    this.ctx.fillStyle = `rgba(${this.color[0]}, ${this.color[1]}, ${this.color[2]}, ${this.opacity})`;
+    this.ctx.fillStyle = `hsla(${this.color}, 100%, 65%, ${this.opacity})`;
     this.ctx.beginPath();
-    this.ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+    this.ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
     this.ctx.fill();
     this.ctx.closePath();
   }

@@ -18,7 +18,7 @@ export default class Tail extends CanvasOption {
     this.opacity = -this.vy;
   }
   draw() {
-    this.ctx.fillStyle = `rgb(${this.color[0]}, ${this.color[1]}, ${this.color[2]}, ${this.opacity})`;
+    this.ctx.fillStyle = `hsla(${this.color}, 100%, 65%, ${this.opacity})`;
     this.ctx.beginPath();
     this.ctx.arc(this.x, this.y, 1, 0, Math.PI * 2);
     this.ctx.fill();
