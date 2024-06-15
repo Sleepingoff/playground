@@ -11,22 +11,18 @@ import {
   runner,
 } from "./index.js";
 import { createBar } from "./func.js";
-import { calcBarLocalPosition } from "./util.js";
+import { calcBarLocalPosition, isNearTarget, moveTo } from "./util.js";
 
 const DEG_TO_RAD = Math.PI / 180;
 const BAR_INIT_LENGTH = 80;
 const BAR_INIT_WIDTH = 5;
 const BAR_INIT_ANGLE = 60;
 const BAR_SECOND_ANGLE = -90; //음수값으로 고정
-const VELOCITY_LENGTH = 30;
-const composites = [];
-let isMove = false;
-let isMouseOn = false;
-let isDown = false;
-let downState = "stop"; // "up", "down"
-let isClick = false;
 
-let index = 0;
+const composites = [];
+let isMouseOn = false;
+let clawState = "stop"; // "up", "down", pending
+let isClick = false;
 
 //todo: 각각의 움직임 분리하기
 // 1. x 좌표 움직임
@@ -34,17 +30,6 @@ let currentX = 100;
 let xTargetPosiiton = currentX + 200;
 //click -> currentMousePositionX와 비교 -> xMovement 이동
 
-function moveTo(current, target) {
-  const threshold = 2; // 목표 근처로 간주할 거리
-  const movement = target - current;
-  //근접하지만 target까지 갈 수 없음
-  if (Math.abs(movement) < threshold) {
-    return target;
-  }
-
-  const velocity = movement / VELOCITY_LENGTH;
-  return current + velocity;
-}
 function moveToX(target) {
   return (currentX = moveTo(currentX, target));
 }
@@ -53,37 +38,46 @@ function moveToX(target) {
 let currentY = 0;
 let yTargetPosition = canvasHeight;
 //기본적으로 current가 항상 낮은 값으로 취급.
-//즉, moveToY의 기본 동작은 down
 
 function moveToY(target) {
   return (currentY = moveTo(currentY, target));
 }
 // 3. 각도 움직임
-const MAX_INIT_RAD = 90 * DEG_TO_RAD;
-const MIN_INIT_RAD = 0 * DEG_TO_RAD;
+const MAX_INIT_RAD = BAR_INIT_ANGLE * DEG_TO_RAD;
+const MIN_INIT_RAD = -(BAR_INIT_ANGLE - 90) * DEG_TO_RAD;
 
-const MAX_SECOND_RAD = -90 * DEG_TO_RAD;
-const MIN_SECOND_RAD = -180 * DEG_TO_RAD;
+const MAX_SECOND_RAD = BAR_SECOND_ANGLE * DEG_TO_RAD;
+const MIN_SECOND_RAD = -180 * DEG_TO_RAD - MAX_INIT_RAD;
 //현재 y좌표 혹은 충돌 여부에 따라 동작
 //이 함수가 실행되면 다른 움직임은 취소
-let isRotateMinToMax = false;
-function rotateTo([currentInitRad, currentSecondRad]) {
-  //기본은 모두 min으로 설정
-  //min -> max -> min 순으로 움직임
-  if (isRotateMinToMax) {
-    //증감값은 추후 조정
-    currentInitRad < MAX_INIT_RAD && currentInitRad++;
-    currentSecondRad < MAX_SECOND_RAD && currentSecondRad--;
-  } else {
-    currentInitRad < MAX_INIT_RAD && currentInitRad--;
-    currentSecondRad < MAX_SECOND_RAD && currentSecondRad++;
-  }
+let isRotate = clawState === "pending";
+//기본은 모두 min으로 설정
+//min -> max -> min 순으로 움직임
+//증감값은 추후 조정
+let isMax = false;
+let isEndRotate = false;
+function rotateMinToMax([currentInitRad, currentSecondRad]) {
+  //min -> max
+  if (currentInitRad >= MIN_INIT_RAD)
+    currentInitRad = currentInitRad - (1 / 2) * DEG_TO_RAD;
+  if (currentSecondRad >= MIN_SECOND_RAD)
+    currentSecondRad = currentSecondRad - 2 * DEG_TO_RAD;
 
+  isMax = isNearTarget(currentInitRad, MIN_INIT_RAD);
+  return [currentInitRad, currentSecondRad];
+}
+
+function rotateMaxToMin([currentInitRad, currentSecondRad]) {
+  if (currentInitRad <= MAX_INIT_RAD)
+    currentInitRad = currentInitRad + (1 / 2) * DEG_TO_RAD;
+  if (currentSecondRad <= MAX_SECOND_RAD)
+    currentSecondRad = currentSecondRad + 2 * DEG_TO_RAD;
+  isEndRotate = isNearTarget(currentInitRad, MAX_INIT_RAD);
   return [currentInitRad, currentSecondRad];
 }
 
 Events.on(mouseConstraint, "mousedown", () => {
-  isClick = !isClick;
+  isClick = true;
   xTargetPosiiton = mouse.position.x;
   yTargetPosition = mouse.position.y;
 });
@@ -94,41 +88,57 @@ render.canvas.addEventListener("mouseover", (event) => {
 render.canvas.addEventListener("mouseleave", () => {
   isMouseOn = false;
 });
-
+let initialAngleRad = MAX_INIT_RAD;
+let secondAngleRad = MAX_SECOND_RAD;
 Events.on(runner, "tick", () => {
-  const initialAngleRad = BAR_INIT_ANGLE * DEG_TO_RAD;
-  const secondAngleRad = BAR_SECOND_ANGLE * DEG_TO_RAD;
-
   composites.forEach((comp) => {
     Composite.remove(engine.world, comp);
   });
   composites.length = 0; // 배열 초기화
-  const currentMousePosition = moveToX(xTargetPosiiton);
+  let currentMousePosition = moveToX(xTargetPosiiton);
   //if, else if 등으로 하는 것보다 가독성이 좋음
   //if문으로만 했을 때 잘못하면 서로의 동작에 관여하게 됨
   switch (true) {
-    case yTargetPosition === currentY && !isRotateMinToMax:
-      downState = "up";
-      isClick = false;
+    case isRotate:
+      //회전 중이라면 기다려
+      clawState = "pending";
       break;
     case xTargetPosiiton === currentMousePosition && isClick:
-      downState = "down";
+      //지정한 x좌표에 도착했으면 움직여
+      clawState = "move";
       break;
-    case isRotateMinToMax && !isClick:
-      downState = "stop";
+    case xTargetPosiiton != currentMousePosition && isClick:
+      //x좌표가 지정되면 준비해
+      clawState = "ready";
       break;
+    case !isClick:
+      //일이 끝나면 제자리로 가
+      clawState = "stop";
   }
 
-  switch (downState) {
-    case "up":
-      currentY = moveToY(0);
-      break;
-    case "down":
+  switch (clawState) {
+    case "move":
       currentY = moveToY(yTargetPosition);
+      isRotate = yTargetPosition === currentY && yTargetPosition != 0;
+      isClick = currentY != 0;
       break;
-    default:
+    case "ready":
+      break;
+    case "stop":
+      xTargetPosiiton = 300;
+      break;
+    case "pending":
       currentY = moveToY(currentY);
+      [initialAngleRad, secondAngleRad] = isMax
+        ? rotateMaxToMin([initialAngleRad, secondAngleRad])
+        : rotateMinToMax([initialAngleRad, secondAngleRad]);
+      if (isEndRotate) {
+        isRotate = false;
+        yTargetPosition = 0;
+        isEndRotate = false;
+      }
   }
+  console.log(clawState);
   const bar = createBar(
     currentMousePosition,
     BAR_INIT_LENGTH,
