@@ -18,11 +18,12 @@ const BAR_INIT_LENGTH = 80;
 const BAR_INIT_WIDTH = 5;
 const BAR_INIT_ANGLE = 60;
 const BAR_SECOND_ANGLE = -90; //음수값으로 고정
-
+const VELOCITY_LENGTH = 30;
 const composites = [];
 let isMove = false;
 let isMouseOn = false;
 let isDown = false;
+let downState = "stop"; // "up", "down"
 let isClick = false;
 
 let index = 0;
@@ -32,14 +33,20 @@ let index = 0;
 let currentX = 100;
 let xTargetPosiiton = currentX + 200;
 //click -> currentMousePositionX와 비교 -> xMovement 이동
+
+function moveTo(current, target) {
+  const threshold = 2; // 목표 근처로 간주할 거리
+  const movement = target - current;
+  //근접하지만 target까지 갈 수 없음
+  if (Math.abs(movement) < threshold) {
+    return target;
+  }
+
+  const velocity = movement / VELOCITY_LENGTH;
+  return current + velocity;
+}
 function moveToX(target) {
-  const xMovement = currentX - target;
-  // 다 움직임.
-  if (xMovement === 0) return currentX;
-  //xMovement > 0 ? 왼쪽 이동 : 오른쪽 이동
-  currentX = xMovement > 0 ? currentX - 2 : currentX + 2;
-  if (xMovement === 1) currentX--;
-  return xMovement > 0 ? currentX - 2 : currentX + 2;
+  return (currentX = moveTo(currentX, target));
 }
 // 2. y 좌표 움직임
 //충돌 지점
@@ -47,14 +54,9 @@ let currentY = 0;
 let yTargetPosition = canvasHeight;
 //기본적으로 current가 항상 낮은 값으로 취급.
 //즉, moveToY의 기본 동작은 down
+
 function moveToY(target) {
-  const yMovement = target - currentY;
-  // 다 움직임.
-  if (yMovement === 0) return currentY;
-  //yMovement > 0 ? 아래로 이동 : 위로 이동
-  currentY = yMovement > 0 ? currentY + 2 : currentY - 2;
-  if (yMovement === 1) currentY--;
-  return yMovement > 0 ? currentY + 2 : currentY - 2;
+  return (currentY = moveTo(currentY, target));
 }
 // 3. 각도 움직임
 const MAX_INIT_RAD = 90 * DEG_TO_RAD;
@@ -64,7 +66,7 @@ const MAX_SECOND_RAD = -90 * DEG_TO_RAD;
 const MIN_SECOND_RAD = -180 * DEG_TO_RAD;
 //현재 y좌표 혹은 충돌 여부에 따라 동작
 //이 함수가 실행되면 다른 움직임은 취소
-let isRotateMinToMax = true;
+let isRotateMinToMax = false;
 function rotateTo([currentInitRad, currentSecondRad]) {
   //기본은 모두 min으로 설정
   //min -> max -> min 순으로 움직임
@@ -102,22 +104,36 @@ Events.on(runner, "tick", () => {
   });
   composites.length = 0; // 배열 초기화
   const currentMousePosition = moveToX(xTargetPosiiton);
-  if (currentMousePosition === currentX && isClick) {
-    //todo: isDown이 현재 boolean이나 rotate까지 들어가면 string형태로 확인하자.
-    if (!isDown && yTargetPosition != currentY) {
-      index = moveToY(yTargetPosition);
-      isDown = index > yTargetPosition;
-    }
-    if (isDown) index = moveToY(0);
-  } else {
-    isDown = false;
+  //if, else if 등으로 하는 것보다 가독성이 좋음
+  //if문으로만 했을 때 잘못하면 서로의 동작에 관여하게 됨
+  switch (true) {
+    case yTargetPosition === currentY && !isRotateMinToMax:
+      downState = "up";
+      isClick = false;
+      break;
+    case xTargetPosiiton === currentMousePosition && isClick:
+      downState = "down";
+      break;
+    case isRotateMinToMax && !isClick:
+      downState = "stop";
+      break;
   }
 
+  switch (downState) {
+    case "up":
+      currentY = moveToY(0);
+      break;
+    case "down":
+      currentY = moveToY(yTargetPosition);
+      break;
+    default:
+      currentY = moveToY(currentY);
+  }
   const bar = createBar(
     currentMousePosition,
     BAR_INIT_LENGTH,
     BAR_INIT_WIDTH,
-    BAR_INIT_LENGTH + index,
+    BAR_INIT_LENGTH + currentY,
     0,
     {
       render: {
@@ -134,8 +150,11 @@ Events.on(runner, "tick", () => {
   });
 
   composites.push(bar, barConstraint);
-  createChain(currentMousePosition, index, [-initialAngleRad, secondAngleRad]);
-  createChain(currentMousePosition, index, [
+  createChain(currentMousePosition, currentY, [
+    -initialAngleRad,
+    secondAngleRad,
+  ]);
+  createChain(currentMousePosition, currentY, [
     Math.PI + initialAngleRad,
     -secondAngleRad,
   ]);
