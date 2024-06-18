@@ -30,8 +30,8 @@ let currentX = 100;
 let xTargetPosiiton = currentX + 200;
 //click -> currentMousePositionX와 비교 -> xMovement 이동
 
-function moveToX(currentX, target) {
-  return moveTo(currentX, target);
+function moveToX(current, target) {
+  return moveTo(current, target);
 }
 // 2. y 좌표 움직임
 //충돌 지점
@@ -39,8 +39,8 @@ let currentY = 0;
 let yTargetPosition = canvasHeight;
 //기본적으로 current가 항상 낮은 값으로 취급.
 
-function moveToY(currentY, target) {
-  return moveTo(currentY, target);
+function moveToY(current, target) {
+  return moveTo(current, target);
 }
 // 3. 각도 움직임
 const MAX_INIT_RAD = BAR_INIT_ANGLE * DEG_TO_RAD;
@@ -56,6 +56,7 @@ let isRotate = clawState === "pending";
 //증감값은 추후 조정
 let isMax = false;
 let isEndRotate = false;
+
 function rotateMinToMax([currentInitRad, currentSecondRad]) {
   //min -> max
   if (currentInitRad >= MIN_INIT_RAD)
@@ -83,13 +84,56 @@ function rotateMaxToMin([currentInitRad, currentSecondRad]) {
   isEndRotate = isNearTarget(currentInitRad, MAX_INIT_RAD);
   return [currentInitRad, currentSecondRad];
 }
+//AS-IS: rotate함수에서 내부에서 방향에 따라 부호만 달라진다.
+//TO-BE: 방향까지 입력받아 보자.
+//directValue = 1 | -1
+function rotateTo(array, directValue) {
+  //ranage에 해당하는 값을 어떻게 받는 게 좋을까? param: [currentInitRad, currentSecondRad] -> array로 변경
+  //array : [{rad, range}]
+  //array의 길이가 달라질 수 있으므로 반복문 사용
 
-//AS-IS: rotate함수에서 내부의 if로직이 반복된다.
-//TO-BE: moveTo처럼 rotate 내부의 계산 로직만 분리하자.
-function add2NumsWhenInRange(num1, num2, minRange, maxRange) {
-  let result = 0;
-  if (minRange <= num1 && num1 >= maxRange) result = num1 + num2;
-  return result;
+  //배열 복사 - 외부 값을 그대로 쓰는 것이 아닌 내부에서 한 번 복사 후 사용하여 데이터 불변성을 지키자.
+  const copy = [...array];
+
+  for (let i = 0; i < copy.length; i++) {
+    //내부 객체 복사
+    copy[i] = Object.assign(copy[i], array[i]);
+    const isRadInRange = isInRange(
+      copy[i].rad,
+      copy[i].range.min,
+      copy[i].range.max
+    );
+    if (isRadInRange)
+      copy[i].rad = add2Nums(copy[i].rad, copy[i].value * directValue);
+  }
+  //isMax, isEndRotate를 외부에서 계산할 수 있지 않을까?
+  const isOpened = isNearTarget(copy[0].rad, copy[0].range.min);
+  const isClosed = isNearTarget(copy[0].rad, copy[0].range.max);
+  return [copy, isOpened, isClosed];
+}
+
+function add2Nums(num1, num2) {
+  return num1 + num2;
+}
+
+function isInRange(num, minRange, maxRange) {
+  return minRange <= num && num <= maxRange;
+}
+
+//이전 값을 클로저에 저장하기 위한 상태 관리 함수
+//현재 집게가 열리고 있는지 닫히고 있는지 확인하기 위해 이전값과 비교하려함
+function comparePrevAndCurrent() {
+  let prev;
+
+  function setPrev(current) {
+    prev = current;
+  }
+
+  function getPrev() {
+    return prev;
+  }
+
+  return [setPrev, getPrev];
 }
 
 Events.on(mouseConstraint, "mousedown", () => {
@@ -104,14 +148,30 @@ render.canvas.addEventListener("mouseover", (event) => {
 render.canvas.addEventListener("mouseleave", () => {
   isMouseOn = false;
 });
-let initialAngleRad = MAX_INIT_RAD;
-let secondAngleRad = MAX_SECOND_RAD;
+
+let arrayOfRad = [
+  {
+    rad: MAX_INIT_RAD,
+    value: (1 / 2) * DEG_TO_RAD,
+    range: { min: MIN_INIT_RAD, max: MAX_INIT_RAD },
+  },
+  {
+    rad: MAX_SECOND_RAD,
+    value: 2 * DEG_TO_RAD,
+    range: { min: MIN_SECOND_RAD, max: MAX_SECOND_RAD },
+  },
+];
+const [setPrev, getPrev] = comparePrevAndCurrent();
+setPrev(MAX_INIT_RAD);
+
 Events.on(runner, "tick", () => {
   composites.forEach((comp) => {
     Composite.remove(engine.world, comp);
   });
   composites.length = 0; // 배열 초기화
-  let currentMousePosition = moveToX(currentX, xTargetPosiiton);
+
+  currentX = moveToX(currentX, xTargetPosiiton);
+
   //if, else if 등으로 하는 것보다 가독성이 좋음
   //if문으로만 했을 때 잘못하면 서로의 동작에 관여하게 됨
   switch (true) {
@@ -119,11 +179,11 @@ Events.on(runner, "tick", () => {
       //회전 중이라면 기다려
       clawState = "pending";
       break;
-    case xTargetPosiiton === currentMousePosition && isClick:
+    case xTargetPosiiton === currentX && isClick:
       //지정한 x좌표에 도착했으면 움직여
       clawState = "move";
       break;
-    case xTargetPosiiton != currentMousePosition && isClick:
+    case xTargetPosiiton != currentX && isClick:
       //x좌표가 지정되면 준비해
       clawState = "ready";
       break;
@@ -131,7 +191,6 @@ Events.on(runner, "tick", () => {
       //일이 끝나면 제자리로 가
       clawState = "stop";
   }
-
   switch (clawState) {
     case "move":
       currentY = moveToY(currentY, yTargetPosition);
@@ -144,19 +203,26 @@ Events.on(runner, "tick", () => {
       xTargetPosiiton = 300;
       break;
     case "pending":
-      currentY = moveToY(currentY);
-      [initialAngleRad, secondAngleRad] = isMax
-        ? rotateMaxToMin([initialAngleRad, secondAngleRad])
-        : rotateMinToMax([initialAngleRad, secondAngleRad]);
-      if (isEndRotate) {
+      currentY = moveToY(currentY, yTargetPosition);
+      const prev = getPrev();
+      const directValue = prev - arrayOfRad[0].rad < 0 ? 1 : -1;
+      const [array, isOpened, isClosed] = rotateTo(arrayOfRad, directValue);
+
+      arrayOfRad = array;
+
+      if (isOpened) {
+        isEndRotate = true;
+        setPrev(arrayOfRad[0].range.min);
+      } else if (isClosed && isEndRotate) {
         isRotate = false;
-        yTargetPosition = 0;
         isEndRotate = false;
+        yTargetPosition = 0;
+        setPrev(arrayOfRad[0].range.max);
       }
   }
-  console.log(clawState);
+
   const bar = createBar(
-    currentMousePosition,
+    currentX,
     BAR_INIT_LENGTH,
     BAR_INIT_WIDTH,
     BAR_INIT_LENGTH + currentY,
@@ -167,22 +233,18 @@ Events.on(runner, "tick", () => {
       },
     }
   );
-
   const barConstraint = Constraint.create({
     bodyA: bar,
     pointA: { x: 0, y: -BAR_INIT_LENGTH / 2 },
-    pointB: { x: currentMousePosition, y: 0 },
+    pointB: { x: currentX, y: 0 },
     length: 0,
   });
 
   composites.push(bar, barConstraint);
-  createChain(currentMousePosition, currentY, [
-    -initialAngleRad,
-    secondAngleRad,
-  ]);
-  createChain(currentMousePosition, currentY, [
-    Math.PI + initialAngleRad,
-    -secondAngleRad,
+  createChain(currentX, currentY, [-arrayOfRad[0].rad, arrayOfRad[1].rad]);
+  createChain(currentX, currentY, [
+    Math.PI + arrayOfRad[0].rad,
+    -arrayOfRad[1].rad,
   ]);
 
   Composite.add(engine.world, composites);
