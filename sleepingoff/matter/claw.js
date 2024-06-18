@@ -30,8 +30,8 @@ let currentX = 100;
 let xTargetPosiiton = currentX + 200;
 //click -> currentMousePositionX와 비교 -> xMovement 이동
 
-function moveToX(target) {
-  return (currentX = moveTo(currentX, target));
+function moveToX(currentX, target) {
+  return moveTo(currentX, target);
 }
 // 2. y 좌표 움직임
 //충돌 지점
@@ -39,8 +39,8 @@ let currentY = 0;
 let yTargetPosition = canvasHeight;
 //기본적으로 current가 항상 낮은 값으로 취급.
 
-function moveToY(target) {
-  return (currentY = moveTo(currentY, target));
+function moveToY(currentY, target) {
+  return moveTo(currentY, target);
 }
 // 3. 각도 움직임
 const MAX_INIT_RAD = BAR_INIT_ANGLE * DEG_TO_RAD;
@@ -68,12 +68,28 @@ function rotateMinToMax([currentInitRad, currentSecondRad]) {
 }
 
 function rotateMaxToMin([currentInitRad, currentSecondRad]) {
-  if (currentInitRad <= MAX_INIT_RAD)
-    currentInitRad = currentInitRad + (1 / 2) * DEG_TO_RAD;
-  if (currentSecondRad <= MAX_SECOND_RAD)
-    currentSecondRad = currentSecondRad + 2 * DEG_TO_RAD;
+  currentInitRad = add2NumsWhenInRange(
+    currentInitRad,
+    (1 / 2) * DEG_TO_RAD,
+    MIN_INIT_RAD,
+    MAX_INIT_RAD
+  );
+  currentSecondRad = add2NumsWhenInRange(
+    currentSecondRad,
+    2 * DEG_TO_RAD,
+    MIN_SECOND_RAD,
+    MAX_SECOND_RAD
+  );
   isEndRotate = isNearTarget(currentInitRad, MAX_INIT_RAD);
   return [currentInitRad, currentSecondRad];
+}
+
+//AS-IS: rotate함수에서 내부의 if로직이 반복된다.
+//TO-BE: moveTo처럼 rotate 내부의 계산 로직만 분리하자.
+function add2NumsWhenInRange(num1, num2, minRange, maxRange) {
+  let result = 0;
+  if (minRange <= num1 && num1 >= maxRange) result = num1 + num2;
+  return result;
 }
 
 Events.on(mouseConstraint, "mousedown", () => {
@@ -95,7 +111,7 @@ Events.on(runner, "tick", () => {
     Composite.remove(engine.world, comp);
   });
   composites.length = 0; // 배열 초기화
-  let currentMousePosition = moveToX(xTargetPosiiton);
+  let currentMousePosition = moveToX(currentX, xTargetPosiiton);
   //if, else if 등으로 하는 것보다 가독성이 좋음
   //if문으로만 했을 때 잘못하면 서로의 동작에 관여하게 됨
   switch (true) {
@@ -118,7 +134,7 @@ Events.on(runner, "tick", () => {
 
   switch (clawState) {
     case "move":
-      currentY = moveToY(yTargetPosition);
+      currentY = moveToY(currentY, yTargetPosition);
       isRotate = yTargetPosition === currentY && yTargetPosition != 0;
       isClick = currentY != 0;
       break;
